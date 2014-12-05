@@ -14,11 +14,7 @@ import (
     "encoding/json"
 )
 
-var (
-    targetDomain string
-    dnspodEmail  string
-    dnspodPasswd string
-)
+var config *Config
 
 type DomainResponse struct {
     Status  Status
@@ -64,20 +60,21 @@ type Record struct {
 }
 
 type Config struct {
-    TargetDomain string
+    TargetDomains []string
     DnspodEmail  string
     DnspodPasswd string
 }
 
 func main() {
-    parseConfigFile()
-    ticker := time.NewTicker(30 * time.Second)
+    config = parseConfigFile()
+    ticker := time.NewTicker(2 * time.Second)
+    fmt.Println("ddns started.")
     for _ = range ticker.C {
         checkOrUpdate()
     }
 }
 
-func parseConfigFile() {
+func parseConfigFile() *Config {
     _, execDir, _, ok := runtime.Caller(0)
     if !ok {
         fmt.Println(execDir)
@@ -93,54 +90,58 @@ func parseConfigFile() {
 
     var config Config
     json.Unmarshal(content, &config)
-
-    targetDomain = config.TargetDomain
-    dnspodEmail  = config.DnspodEmail
-    dnspodPasswd = config.DnspodPasswd
+    return &config
 }
 
 func checkOrUpdate() {
     nowIp    := getNowIp()
-    domainId := getDomainId()
-    recordId, recordIp := getRecordIdAndRecordIp(domainId)
 
-    if nowIp != recordIp {
-        fmt.Println("Starting update domain dns...")
-        fmt.Printf("now ip: %s, record ip: %s, target_domain: %s, domain_id: %d, record_id: %s\n", nowIp, recordIp, targetDomain, domainId, recordId)
-        updateTargetDomainDNS(domainId, recordId)
-        fmt.Println("Success to update")
-    } else {
-        fmt.Printf("now ip: %s, record ip: %s\n", nowIp, recordIp)
-        fmt.Println("No need update")
+    for _, domainName := range config.TargetDomains {
+        domainId := getDomainId(domainName)
+        recordId, recordIp := getRecordIdAndRecordIp(domainName, domainId)
+        if len(recordId) < 1 {
+            fmt.Println("domain %s record not found, skip update", domainName)
+            continue
+        }
+
+        if nowIp != recordIp {
+            if err := updateTargetDomainDNS(domainName, domainId, recordId); err == nil {
+                fmt.Printf("Success to update domain_name: %s, now ip: %s, record ip: %s\n", domainName, nowIp, recordIp)
+            } else {
+                fmt.Printf("Failed to update domain_name: %s, now ip: %s, record ip: %s\n", domainName, nowIp, recordIp)
+            }
+        } else {
+            fmt.Printf("Domain %s no need to update, now ip: %s, record ip: %s\n", domainName, nowIp, recordIp)
+        }
     }
 }
 
-func updateTargetDomainDNS(domainId int, recordId string) error {
+func updateTargetDomainDNS(domainName string, domainId int, recordId string) (err error) {
     updateUrl := "https://dnsapi.cn/Record.Ddns"
     parms     := make(url.Values, 0)
 
-    parms.Add("login_email", dnspodEmail)
-    parms.Add("login_password", dnspodPasswd)
+    parms.Add("login_email", config.DnspodEmail)
+    parms.Add("login_password", config.DnspodPasswd)
     parms.Add("domain_id", strconv.Itoa(domainId))
     parms.Add("record_id", recordId)
-    parms.Add("sub_domain", strings.Split(targetDomain, ".")[0])
+    parms.Add("sub_domain", strings.Split(domainName, ".")[0])
     parms.Add("record_line", "默认")
-    parms.Add("formst", "json")
+    parms.Add("format", "json")
 
-    _, err := http.PostForm(updateUrl, parms)
+    _, err = http.PostForm(updateUrl, parms)
     if err != nil {
         fmt.Println("cannot update damian dns", updateUrl)
-        return err
+        return
     }
 
-    return nil
+    return err
 }
 
-func getDomainId() (domainId int) {
+func getDomainId(domainName string) (domainId int) {
     domainUrl := "https://dnsapi.cn/Domain.List"
     parms     := make(url.Values, 0)
-    parms.Add("login_email", dnspodEmail)
-    parms.Add("login_password", dnspodPasswd)
+    parms.Add("login_email", config.DnspodEmail)
+    parms.Add("login_password", config.DnspodPasswd)
     parms.Add("format", "json")
 
     res, err := http.PostForm(domainUrl, parms)
@@ -159,19 +160,19 @@ func getDomainId() (domainId int) {
     json.Unmarshal(body, &dr)
 
     for _, domain := range dr.Domains {
-        if strings.Index(targetDomain, domain.Name) != -1 {
+        if strings.Index(domainName, domain.Name) != -1 {
             return domain.Id
         }
     }
     return
 }
 
-func getRecordIdAndRecordIp(domainId int) (recordId, recordIp string) {
+func getRecordIdAndRecordIp(domainName string, domainId int) (recordId, recordIp string) {
     recordUrl := "https://dnsapi.cn/Record.List"
     parms     := make(url.Values, 0)
 
-    parms.Add("login_email", dnspodEmail)
-    parms.Add("login_password", dnspodPasswd)
+    parms.Add("login_email", config.DnspodEmail)
+    parms.Add("login_password", config.DnspodPasswd)
     parms.Add("domain_id", strconv.Itoa(domainId))
     parms.Add("format", "json")
 
@@ -191,7 +192,7 @@ func getRecordIdAndRecordIp(domainId int) (recordId, recordIp string) {
     json.Unmarshal(body, &rr)
 
     for _, record := range rr.Records {
-        if strings.Index(targetDomain, record.Name) != -1 {
+        if strings.Index(domainName, record.Name) != -1 {
             return record.Id, record.Value
         }
     }
