@@ -67,10 +67,19 @@ type Config struct {
 
 func main() {
     config = parseConfigFile()
-    ticker := time.NewTicker(2 * time.Second)
+    //ticker := time.NewTicker(2 * time.Second)
     fmt.Println("ddns started.")
-    for _ = range ticker.C {
-        checkOrUpdate()
+
+    for {
+        done := make(chan int)
+        go checkOrUpdate(done)
+
+        ticker := time.NewTicker(5 * time.Second)
+        select {
+        case <-done:
+            time.Sleep(10 * time.Second)
+        case <-ticker.C:
+        }
     }
 }
 
@@ -93,7 +102,7 @@ func parseConfigFile() *Config {
     return &config
 }
 
-func checkOrUpdate() {
+func checkOrUpdate(done chan int) {
     nowIp    := getNowIp()
 
     for _, domainName := range config.TargetDomains {
@@ -114,6 +123,7 @@ func checkOrUpdate() {
             fmt.Printf("Domain %s no need to update, now ip: %s, record ip: %s\n", domainName, nowIp, recordIp)
         }
     }
+    close(done)
 }
 
 func updateTargetDomainDNS(domainName string, domainId int, recordId string) (err error) {
