@@ -213,12 +213,12 @@ func getNowIp() string {
     ipUrl := "http://agideo.com/ip"
     res, err := http.Get(ipUrl)
     if err != nil {
-        fmt.Println("cannot get current ip via ", ipUrl)
+        fmt.Println("cannot get current ip via ", ipUrl, err.Error())
         return ""
     }
     nowIp, err1 := ioutil.ReadAll(res.Body)
     if err1 != nil {
-        fmt.Println("cannot get current ip via ", ipUrl)
+        fmt.Println("read err, cannot get current ip via ", ipUrl, err.Error())
         return ""
     }
 
