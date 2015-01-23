@@ -138,11 +138,13 @@ func updateTargetDomainDNS(domainName string, domainId int, recordId string) (er
     parms.Add("record_line", "默认")
     parms.Add("format", "json")
 
-    _, err = http.PostForm(updateUrl, parms)
+    var res *http.Response
+    res, err = http.PostForm(updateUrl, parms)
     if err != nil {
         fmt.Println("cannot update damian dns", updateUrl)
         return
     }
+    defer res.Body.Close()
 
     return err
 }
@@ -160,6 +162,7 @@ func getDomainId(domainName string) (domainId int) {
         return
     }
 
+    defer res.Body.Close()
     body, err1 := ioutil.ReadAll(res.Body)
     if err1 != nil {
         fmt.Println("cannot get damian id via ", domainUrl)
@@ -192,6 +195,7 @@ func getRecordIdAndRecordIp(domainName string, domainId int) (recordId, recordIp
         return
     }
 
+    defer res.Body.Close()
     body, err1 := ioutil.ReadAll(res.Body)
     if err1 != nil {
         fmt.Println("cannot get record id via ", recordUrl)
@@ -216,6 +220,7 @@ func getNowIp() string {
         fmt.Println("cannot get current ip via ", ipUrl, err.Error())
         return ""
     }
+    defer res.Body.Close()
     nowIp, err1 := ioutil.ReadAll(res.Body)
     if err1 != nil {
         fmt.Println("read err, cannot get current ip via ", ipUrl, err.Error())
