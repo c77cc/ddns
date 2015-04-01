@@ -67,17 +67,21 @@ type Config struct {
 
 func main() {
     config = parseConfigFile()
-    //ticker := time.NewTicker(2 * time.Second)
     fmt.Println("ddns started.")
 
     for {
-        done := make(chan int)
+        done := make(chan int, 1)
         go checkOrUpdate(done)
 
         ticker := time.NewTicker(5 * time.Second)
         select {
-        case <-done:
-            time.Sleep(10 * time.Second)
+        case flag := <-done:
+            if flag > 0 {
+                fmt.Println("sleep 1 hour...")
+                time.Sleep(1 * time.Hour)
+            } else {
+                time.Sleep(10 * time.Second)
+            }
         case <-ticker.C:
         }
     }
@@ -103,13 +107,17 @@ func parseConfigFile() *Config {
 }
 
 func checkOrUpdate(done chan int) {
-    nowIp    := getNowIp()
+    nowIp := getNowIp()
+    var deepSleep bool
 
     for _, domainName := range config.TargetDomains {
         domainId := getDomainId(domainName)
-        recordId, recordIp := getRecordIdAndRecordIp(domainName, domainId)
+        recordId, recordIp, ds := getRecordIdAndRecordIp(domainName, domainId)
+        if ds {
+            deepSleep = ds
+        }
         if len(recordId) < 1 {
-            fmt.Println("domain %s record not found, skip update", domainName)
+            fmt.Println("domain ", domainName ," record not found, skip update")
             continue
         }
 
@@ -122,6 +130,11 @@ func checkOrUpdate(done chan int) {
         } else {
             fmt.Printf("Domain %s no need to update, now ip: %s, record ip: %s\n", domainName, nowIp, recordIp)
         }
+    }
+
+    if deepSleep {
+        done <- 1
+        return
     }
     close(done)
 }
@@ -180,7 +193,7 @@ func getDomainId(domainName string) (domainId int) {
     return
 }
 
-func getRecordIdAndRecordIp(domainName string, domainId int) (recordId, recordIp string) {
+func getRecordIdAndRecordIp(domainName string, domainId int) (recordId, recordIp string, deepSleep bool) {
     recordUrl := "https://dnsapi.cn/Record.List"
     parms     := make(url.Values, 0)
 
@@ -204,10 +217,14 @@ func getRecordIdAndRecordIp(domainName string, domainId int) (recordId, recordIp
 
     var rr RecordResponse
     json.Unmarshal(body, &rr)
+    if rr.Status.Code != "1" {
+        fmt.Println(rr.Status.Message)
+        return "", "",  true
+    }
 
     for _, record := range rr.Records {
         if strings.Index(domainName, record.Name) != -1 {
-            return record.Id, record.Value
+            return record.Id, record.Value, false
         }
     }
     return
