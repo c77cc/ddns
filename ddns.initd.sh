@@ -6,7 +6,7 @@
 # Description: 	This file should be used to construct scripts to be placed in /etc/init.d.
 
 PROG="ddns"
-PROG_PATH="/usr/local/ddns/bin"
+PROG_PATH="/usr/local/ddns"
 PID_PATH="/var/run/"
 
 start() {
