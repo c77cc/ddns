@@ -1,5 +1,5 @@
 {
-    "targetDomains": ["your_sub_domain1", "your_sub_domain2"],
+    "domainNames": ["test.domain.com", "test2.domain.com"],
     "dnspodEmail":  "your_dnspod_login_name",
     "dnspodPasswd": "your_dnspod_login_passwd"
 }
