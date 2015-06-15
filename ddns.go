@@ -52,6 +52,7 @@ func loopUpdate(domainInfo *DomainInfo, ch chan int) {
         case <-ticker.C:
             localIp := getLocalIp()
             if len(localIp) < 1 {
+                log.Println("local ip invalid")
                 continue
             }
 
@@ -67,6 +68,7 @@ func loopUpdate(domainInfo *DomainInfo, ch chan int) {
             }
         }
     }
+    log.Println(domainInfo.Name, " thread quit")
     ch <- 1
 }
 
