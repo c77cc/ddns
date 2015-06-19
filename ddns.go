@@ -95,8 +95,9 @@ func init() {
 }
 
 func getLocalIp() (ip string) {
+    cli   := newHttpClient()
     ipUrl := "http://agideo.com/ip"
-    res, err := http.Get(ipUrl)
+    res, err := cli.Get(ipUrl)
     if err != nil {
         log.Println("cannot get local ip via ", ipUrl, err.Error())
         return
@@ -127,6 +128,7 @@ func initDomainInfo(domainName string) (info *DomainInfo) {
 }
 
 func updateDomainDNS(domainInfo *DomainInfo, ip string) (ok bool) {
+    cli       := newHttpClient()
     updateUrl := "https://dnsapi.cn/Record.Ddns"
     parms     := make(url.Values, 0)
 
@@ -139,7 +141,7 @@ func updateDomainDNS(domainInfo *DomainInfo, ip string) (ok bool) {
     parms.Add("record_line", "默认")
     parms.Add("format", "json")
 
-    res, err := http.PostForm(updateUrl, parms)
+    res, err := cli.PostForm(updateUrl, parms)
     if err != nil {
         log.Println("failed update domain dns", updateUrl)
         return
@@ -171,6 +173,7 @@ func updateDomainDNS(domainInfo *DomainInfo, ip string) (ok bool) {
 }
 
 func getDomainId(domainName string) (domainId string) {
+    cli       := newHttpClient()
     domainUrl := "https://dnsapi.cn/Domain.Info"
     parms     := make(url.Values, 0)
     parms.Add("login_email", config.DnspodEmail)
@@ -178,7 +181,7 @@ func getDomainId(domainName string) (domainId string) {
     parms.Add("domain", strings.Join(strings.Split(domainName, ".")[1:], "."))
     parms.Add("format", "json")
 
-    res, err := http.PostForm(domainUrl, parms)
+    res, err := cli.PostForm(domainUrl, parms)
     if err != nil {
         log.Println("cannot get damian id ", domainName, err.Error())
         return
@@ -213,6 +216,7 @@ func getDomainId(domainName string) (domainId string) {
 }
 
 func getRecordIdIp(domainId string, domainName string) (recordId, recordIp string) {
+    cli       := newHttpClient()
     recordUrl := "https://dnsapi.cn/Record.List"
     parms     := make(url.Values, 0)
 
@@ -222,7 +226,7 @@ func getRecordIdIp(domainId string, domainName string) (recordId, recordIp strin
     parms.Add("sub_domain", strings.Split(domainName, ".")[0])
     parms.Add("format", "json")
 
-    res, err := http.PostForm(recordUrl, parms)
+    res, err := cli.PostForm(recordUrl, parms)
     if err != nil {
         log.Println("cannot get record id via ", recordUrl, err.Error())
         return
@@ -268,6 +272,7 @@ func getRecordIdIp(domainId string, domainName string) (recordId, recordIp strin
 }
 
 func createRecord(domainId, domainName string) (recordId, recordIp string, ok bool) {
+    cli       := newHttpClient()
     recordUrl := "https://dnsapi.cn/Record.Create"
     parms     := make(url.Values, 0)
     ip := getLocalIp()
@@ -282,7 +287,7 @@ func createRecord(domainId, domainName string) (recordId, recordIp string, ok bo
     parms.Add("mx", "10")
     parms.Add("format", "json")
 
-    res, err := http.PostForm(recordUrl, parms)
+    res, err := cli.PostForm(recordUrl, parms)
     if err != nil {
         log.Println("cannot create record", domainName, err.Error())
         return
@@ -315,4 +320,8 @@ func createRecord(domainId, domainName string) (recordId, recordIp string, ok bo
 
     log.Println("success to create record", domainName, ip)
     return rr.Record.Id, ip, true
+}
+
+func newHttpClient() *http.Client {
+    return &http.Client{Timeout: 10 * time.Second}
 }
